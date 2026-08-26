@@ -16,7 +16,6 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class Factory {
 
-
     /**
      * @param non-empty-string $name
      */
@@ -30,14 +29,11 @@ class Factory {
     ): ProviderInterface {
         $httpClient = $httpClient instanceof EventSourceHttpClient ? $httpClient : new EventSourceHttpClient($httpClient);
 
-        if (null !== $endpoint) {
-            $defaultOptions = [];
-            if (null !== $apiKey) {
-                $defaultOptions['auth_bearer'] = $apiKey;
-            }
-
-            $httpClient = ScopingHttpClient::forBaseUri($httpClient, $endpoint, $defaultOptions);
+        $defaultOptions = [];
+        if (null !== $apiKey) {
+            $defaultOptions['auth_bearer'] = $apiKey;
         }
+        $httpClient = ScopingHttpClient::forBaseUri($httpClient, $endpoint ?? 'https://chat.smartbrew.ai/', $defaultOptions);
 
         return new Provider(
             $name,

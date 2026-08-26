@@ -4,6 +4,114 @@ declare(strict_types=1);
 
 namespace Symfony\AI\Platform\Bridge\Smartbrew;
 
-class SmartbrewClient {
+use Symfony\AI\Platform\Capability;
+use Symfony\AI\Platform\Exception\InvalidArgumentException;
+use Symfony\AI\Platform\JsonBodyEncodingTrait;
+use Symfony\AI\Platform\Model;
+use Symfony\AI\Platform\ModelClientInterface;
+use Symfony\AI\Platform\Result\RawHttpResult;
+use Symfony\AI\Platform\Result\RawResultInterface;
+use Symfony\AI\Platform\Result\Stream\NdjsonStream;
+use Symfony\AI\Platform\StructuredOutput\PlatformSubscriber;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
+class SmartbrewClient implements ModelClientInterface {
+    use JsonBodyEncodingTrait;
+
+
+    private const CHAT_TOP_LEVEL_KEYS = [
+        'stream',
+        'format',
+        'keep_alive',
+        'tools',
+        'think',
+        'logprobs',
+        'top_logprobs',
+    ];
+
+    private const EMBED_TOP_LEVEL_KEYS = [
+        'truncate',
+        'keep_alive',
+        'dimensions',
+    ];
+
+    public function __construct( private readonly HttpClientInterface $httpClient ) {
+    }
+
+    public function supports( Model $model ): bool {
+        return $model instanceof Smartbrew;
+    }
+
+    public function request( Model $model, array|string $payload, array $options = [] ): RawResultInterface {
+        return match (true) {
+            $model->supports(Capability::INPUT_MESSAGES) => $this->doCompletionRequest($payload, $options),
+            $model->supports(Capability::EMBEDDINGS) => $this->doEmbeddingsRequest($model, $payload, $options),
+            default => throw new InvalidArgumentException(\sprintf('Unsupported model "%s": "%s".', $model::class, $model->getName())),
+        };
+    }
+
+    private function doCompletionRequest(array|string $payload, array $options = []): RawHttpResult
+    {
+        if (\is_string($payload)) {
+            throw new InvalidArgumentException(\sprintf('Payload must be an array, but a string was given to "%s".', self::class));
+        }
+
+        // Revert Ollama's default streaming behavior
+        $options['stream'] ??= false;
+
+        if (isset($options[PlatformSubscriber::RESPONSE_FORMAT]['json_schema']['schema'])) {
+            $options['format'] = $options[PlatformSubscriber::RESPONSE_FORMAT]['json_schema']['schema'];
+            unset($options[PlatformSubscriber::RESPONSE_FORMAT]);
+        }
+
+        $options = self::normalizeOllamaOptions($options, self::CHAT_TOP_LEVEL_KEYS);
+
+        $response = $this->httpClient->request('POST', 'api/chat/completions', [
+            'headers' => ['Content-Type' => 'application/json'],
+            'body' => $this->encodeJsonBody(array_merge($options, $payload)),
+        ]);
+
+        return new RawHttpResult($response, new NdjsonStream());
+    }
+
+    /**
+     * @param array<string|int, mixed> $payload
+     * @param array<string, mixed>     $options
+     */
+    private function doEmbeddingsRequest(Model $model, array|string $payload, array $options = []): RawHttpResult
+    {
+        $options = self::normalizeOllamaOptions($options, self::EMBED_TOP_LEVEL_KEYS);
+
+        return new RawHttpResult($this->httpClient->request('POST', 'api/embeddings', [
+            'json' => array_merge($options, [
+                'model' => $model->getName(),
+                'input' => $payload,
+            ]),
+        ]));
+    }
+
+
+    private static function normalizeOllamaOptions(array $options, array $topLevelKeys): array
+    {
+        $topLevelOptions = [];
+        $nested = [];
+
+        if (isset($options['options']) && \is_array($options['options'])) {
+            $nested = $options['options'];
+        }
+
+        foreach ($options as $key => $value) {
+            if (\in_array($key, $topLevelKeys, true)) {
+                $topLevelOptions[$key] = $value;
+            } else {
+                $nested[$key] ??= $value;
+            }
+        }
+
+        if ([] !== $nested) {
+            $topLevelOptions['options'] = $nested;
+        }
+
+        return $topLevelOptions;
+    }
 }
