@@ -1,5 +1,5 @@
 {
-	"name": "smartbrew/ai-smartbrew-platform",
+	"name": "sudhaus7/ai-smartbrew-platform",
 	"description": "smartbrew.ai platform bridge for Symfony AI",
 	"license": "MIT",
 	"type": "symfony-ai-platform",
