@@ -21,10 +21,16 @@ Installation
 ------------
 
 ```bash
-composer require smartbrew/ai-smartbrew-platform
+composer require sudhaus7/ai-smartbrew-platform
 ```
 
 Requires PHP 8.2+, `symfony/ai-platform` ^0.12 and `symfony/http-client` ^7.3|^8.0.
+
+Set your API key in the environment so the bridge can pick it up without extra wiring:
+
+```dotenv
+SMARTBREW_API_KEY=…
+```
 
 Usage
 -----
@@ -34,9 +40,7 @@ use Symfony\AI\Platform\Bridge\Smartbrew\Factory;
 use Symfony\AI\Platform\Message\Message;
 use Symfony\AI\Platform\Message\MessageBag;
 
-$platform = Factory::createPlatform(
-    apiKey: $_ENV['SMARTBREW_API_KEY'],     // sent as `Authorization: Bearer …`
-);
+$platform = Factory::createPlatform();
 
 $result = $platform->invoke('openai/gpt-oss', new MessageBag(
     Message::forSystem('You are a helpful assistant.'),
@@ -46,9 +50,33 @@ $result = $platform->invoke('openai/gpt-oss', new MessageBag(
 echo $result->asText();
 ```
 
+The endpoint is fixed at `https://chat.smartbrew.ai/` — the factory takes no `$endpoint` argument.
+
 `Factory::createProvider()` returns the bare provider if you want to compose it with other providers
-in your own `Platform` instance. Both factory methods accept a custom `HttpClientInterface`,
-`Contract` and `EventDispatcherInterface`.
+in your own `Platform` instance. Both factory methods accept an `$apiKey`, a custom
+`HttpClientInterface`, `Contract` and `EventDispatcherInterface`.
+
+### Authentication
+
+The API key is sent as `Authorization: Bearer …`. If you do not pass `apiKey` explicitly, the bridge
+falls back to `$_ENV['SMARTBREW_API_KEY']`:
+
+```php
+$platform = Factory::createPlatform();                       // from SMARTBREW_API_KEY
+$platform = Factory::createPlatform(apiKey: 'sk-…');         // explicit, wins over the env var
+```
+
+`Factory::createHttpClient()` exposes the same wiring on its own — a base-URI-scoped
+`EventSourceHttpClient` with the bearer token applied — if you need a preconfigured client outside
+the platform, e.g. to build a standalone `ModelCatalog`:
+
+```php
+$catalog = new ModelCatalog();                                    // client built from SMARTBREW_API_KEY
+$catalog = new ModelCatalog(Factory::createHttpClient(apiKey: 'sk-…'));
+```
+
+Without a client *and* without `SMARTBREW_API_KEY` in the environment, `ModelCatalog` throws an
+`InvalidArgumentException`.
 
 ### Streaming
 
@@ -93,7 +121,8 @@ Capabilities are derived from the server's model metadata:
 | `thinking`                    | `THINKING`            |
 | `vision`                      | `INPUT_IMAGE`         |
 
-Every non-embedding model additionally gets `OUTPUT_STRUCTURED`. Presets (models flagged
+Models that report `completion` additionally get `OUTPUT_TEXT` and `OUTPUT_STREAMING`, and every
+non-embedding model gets `OUTPUT_STRUCTURED`. Presets (models flagged
 `preset: true`) are read from `info.meta.capabilities`, plain models from `ollama.capabilities`.
 A model whose metadata carries no capabilities raises an `InvalidArgumentException` — that usually
 means the Smartbrew server is too old and needs an upgrade.

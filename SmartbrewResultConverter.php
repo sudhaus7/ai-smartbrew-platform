@@ -102,10 +102,10 @@ class SmartbrewResultConverter implements ResultConverterInterface{
         $sawDone = false;
         $finishReason = null;
         foreach ($result->getDataStream() as $data) {
-            // Ollama emits {"error": "..."} on HTTP 200 in practice; not part of the
+            // Smartbrew emits {"error": "..."} on HTTP 200 in practice; not part of the
             // documented schema, so this guard is defensive.
             if (isset($data['error'])) {
-                throw new RuntimeException(\sprintf('Ollama stream error: "%s".', \is_string($data['error']) ? $data['error'] : 'Unknown error'));
+                throw new RuntimeException(\sprintf('Smartbrew stream error: "%s".', \is_string($data['error']) ? $data['error'] : 'Unknown error'));
             }
 
             $sawChunk = true;
@@ -143,7 +143,7 @@ class SmartbrewResultConverter implements ResultConverterInterface{
         }
 
         if ($sawChunk && !$sawDone) {
-            throw new IncompleteStreamException('Ollama stream ended before a "done" message.');
+            throw new IncompleteStreamException('Smartbrew stream ended before a "done" message.');
         }
 
         if (null !== $finishReason) {

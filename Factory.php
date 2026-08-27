@@ -20,20 +20,14 @@ class Factory {
      * @param non-empty-string $name
      */
     public static function createProvider(
-        ?string $endpoint = null,
         #[\SensitiveParameter] ?string $apiKey = null,
         ?HttpClientInterface $httpClient = null,
         ?Contract $contract = null,
         ?EventDispatcherInterface $eventDispatcher = null,
         string $name = 'smartbew',
     ): ProviderInterface {
-        $httpClient = $httpClient instanceof EventSourceHttpClient ? $httpClient : new EventSourceHttpClient($httpClient);
 
-        $defaultOptions = [];
-        if (null !== $apiKey) {
-            $defaultOptions['auth_bearer'] = $apiKey;
-        }
-        $httpClient = ScopingHttpClient::forBaseUri($httpClient, $endpoint ?? 'https://chat.smartbrew.ai/', $defaultOptions);
+        $httpClient = self::createHttpClient($httpClient,$apiKey);
 
         return new Provider(
             $name,
@@ -45,11 +39,25 @@ class Factory {
         );
     }
 
+    public static function createHttpClient(?HttpClientInterface $httpClient=null, ?string $apiKey = null): HttpClientInterface
+    {
+        if ($apiKey === null && isset($_ENV['SMARTBREW_API_KEY'])) {
+            $apiKey = $_ENV['SMARTBREW_API_KEY'];
+        }
+        $httpClient = $httpClient instanceof EventSourceHttpClient ? $httpClient : new EventSourceHttpClient($httpClient);
+
+        $defaultOptions = [];
+        if (null !== $apiKey) {
+            $defaultOptions['auth_bearer'] = $apiKey;
+        }
+        $httpClient = ScopingHttpClient::forBaseUri($httpClient, 'https://chat.smartbrew.ai/', $defaultOptions);
+        return $httpClient;
+    }
+
     /**
      * @param non-empty-string $name
      */
     public static function createPlatform(
-        ?string $endpoint = null,
         #[\SensitiveParameter] ?string $apiKey = null,
         ?HttpClientInterface $httpClient = null,
         ?Contract $contract = null,
@@ -58,7 +66,7 @@ class Factory {
         ?ModelRouterInterface $modelRouter = null,
     ): Platform {
         return new Platform(
-            [self::createProvider($endpoint, $apiKey, $httpClient, $contract, $eventDispatcher, $name)],
+            [self::createProvider($apiKey, $httpClient, $contract, $eventDispatcher, $name)],
             $modelRouter ?? new CatalogBasedModelRouter(),
             $eventDispatcher,
         );
