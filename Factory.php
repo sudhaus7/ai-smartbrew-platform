@@ -24,7 +24,7 @@ class Factory {
         ?HttpClientInterface $httpClient = null,
         ?Contract $contract = null,
         ?EventDispatcherInterface $eventDispatcher = null,
-        string $name = 'smartbew',
+        string $name = 'smartbrew',
     ): ProviderInterface {
 
         $httpClient = self::createHttpClient($httpClient,$apiKey);
