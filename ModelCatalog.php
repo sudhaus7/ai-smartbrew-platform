@@ -36,7 +36,11 @@ class ModelCatalog implements ModelCatalogInterface {
         }
         $payload = null;
         foreach($this->modelCache as $model) {
-            if ($model['id'] === $modelName) {
+            $id = $model['id'];
+            if (\str_ends_with( $id, ':latest')) {
+                $id = \substr( $id, 0, -7 );
+            }
+            if ($id === $modelName) {
                 $payload = $model;
             }
         }
@@ -103,7 +107,7 @@ class ModelCatalog implements ModelCatalogInterface {
     private function fetchModels(): void
     {
         $this->modelCache = [];
-        $response = $this->httpClient->request( 'GET', 'api/models' );
+        $response = $this->httpClient->request( 'GET', 'api/v1/models' );
 
         try {
             $statusCode = $response->getStatusCode();
