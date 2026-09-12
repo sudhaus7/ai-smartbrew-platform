@@ -37,9 +37,9 @@ class ModelCatalog implements ModelCatalogInterface {
         $payload = null;
         foreach($this->modelCache as $model) {
             $id = $model['id'];
-            if (\str_ends_with( $id, ':latest')) {
-                $id = \substr( $id, 0, -7 );
-            }
+            //if (\str_ends_with( $id, ':latest')) {
+               // $id = \substr( $id, 0, -7 );
+            //}
             if ($id === $modelName) {
                 $payload = $model;
             }
